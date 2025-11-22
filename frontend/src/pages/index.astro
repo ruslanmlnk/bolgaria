@@ -1,55 +1,57 @@
 ---
+import { GraphQLClient, gql } from 'graphql-request'
+
 let pageTitle = 'BG Info Enrollment'
 let pageDescription = 'Информация за записване'
 
 const backendBase = (import.meta.env.PUBLIC_PAYLOAD_URL || 'http://localhost:3000').replace(/\/$/, '')
+const graphqlClient = new GraphQLClient(`${backendBase}/api/graphql`)
 
 type MediaDoc = { url?: string; alt?: string } | null
 type InfoItem = { info?: string | null; id?: string | null }
 type HomeDoc = {
   meta?: { metaTitle?: string | null; metaDescription?: string | null }
-  'Hero Image'?: MediaDoc | number | null
-  'Info List'?: InfoItem[] | null
+  heroImage?: MediaDoc | null
+  infoList?: InfoItem[] | null
 }
+
+const HOME_QUERY = gql`
+    query HomeContent {
+    Home {
+      meta {
+        metaTitle
+        metaDescription
+      }
+      heroImage: HeroImage {
+        url
+        alt
+      }
+      infoList: InfoList {
+        id
+        info
+      }
+    }
+  }
+`
 
 let homeData: HomeDoc | null = null
 let homeError = ''
-let fetchTimeout: ReturnType<typeof setTimeout> | undefined
 
 try {
-  const controller = new AbortController()
-  fetchTimeout = setTimeout(() => controller.abort(), 5000)
-
-  const response = await fetch(`${backendBase}/api/globals/home?depth=2`, { signal: controller.signal })
-  const json = await response.json()
-
-  if (!response.ok) {
-    throw new Error(json?.message || `Failed to load home content (${response.status})`)
-  }
-
-  const doc = json && typeof json === 'object' && 'doc' in json ? (json as { doc: HomeDoc }).doc : (json as HomeDoc)
-  homeData = doc ?? null
+  const data = await graphqlClient.request<{ Home?: HomeDoc; GlobalHome?: HomeDoc }>(HOME_QUERY)
+  homeData = data.Home ?? data.GlobalHome ?? null
 } catch (err) {
-  if (err instanceof DOMException && err.name === 'AbortError') {
-    homeError = 'Запит до бекенду перевищив ліміт часу'
-  } else {
-    homeError = err instanceof Error ? err.message : 'Failed to load data'
-  }
-} finally {
-  if (typeof fetchTimeout !== 'undefined') {
-    clearTimeout(fetchTimeout)
-  }
+  homeError = err instanceof Error ? err.message : 'Failed to load data'
 }
 
-const heroImage =
-  homeData && typeof homeData['Hero Image'] === 'object' ? (homeData['Hero Image'] as MediaDoc) : null
+const heroImage = homeData?.heroImage ?? null
 const headerImageUrl =
   (heroImage?.url ? (heroImage.url.startsWith('http') ? heroImage.url : `${backendBase}${heroImage.url}`) : '/img/header.png') ||
   '/img/header.png'
 const headerAlt = heroImage?.alt || 'BG Info header image'
 
-const infoItems = Array.isArray(homeData?.['Info List'])
-  ? (homeData['Info List'] as InfoItem[]).filter((item) => item?.info)
+const infoItems = Array.isArray(homeData?.infoList)
+  ? (homeData.infoList as InfoItem[]).filter((item) => item?.info)
   : []
 
 pageTitle = homeData?.meta?.metaTitle ?? pageTitle
@@ -72,10 +74,10 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
     <main class="container body-content">
       <img class="img-responsive center-block" src={headerImageUrl} alt={headerAlt} />
       <p class="visible-xs-block">&nbsp;</p>
-
       <section class="container">
         <h4>Информация за преписка</h4>
         <hr />
+        <p>&nbsp;</p>
         <p class="sr-only">Моля въведете Вашият входящ номер и ПИН код, за да проверите статуса на преписката.</p>
 
         <div class="validation-summary-errors text-danger">
@@ -128,7 +130,7 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
                 {infoItems.length > 0 ? (
                   infoItems.map((item) => (
                     <li>
-                      <span class="fa fa-check text-success"></span> {item.info}
+                      - {item.info}
                     </li>
                   ))
                 ) : (
@@ -148,10 +150,9 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
         <p></p>
         <hr />
         <footer>
-          <p>&copy; 2025 - Община Бургас</p>
+          <p>&copy; 2025 - Дирекция Българско гражданство</p>
         </footer>
       </section>
     </main>
   </body>
 </html>
-
