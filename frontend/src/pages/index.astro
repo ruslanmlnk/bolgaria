@@ -1,0 +1,157 @@
+---
+let pageTitle = 'BG Info Enrollment'
+let pageDescription = 'Информация за записване'
+
+const backendBase = (import.meta.env.PUBLIC_PAYLOAD_URL || 'http://localhost:3000').replace(/\/$/, '')
+
+type MediaDoc = { url?: string; alt?: string } | null
+type InfoItem = { info?: string | null; id?: string | null }
+type HomeDoc = {
+  meta?: { metaTitle?: string | null; metaDescription?: string | null }
+  'Hero Image'?: MediaDoc | number | null
+  'Info List'?: InfoItem[] | null
+}
+
+let homeData: HomeDoc | null = null
+let homeError = ''
+let fetchTimeout: ReturnType<typeof setTimeout> | undefined
+
+try {
+  const controller = new AbortController()
+  fetchTimeout = setTimeout(() => controller.abort(), 5000)
+
+  const response = await fetch(`${backendBase}/api/globals/home?depth=2`, { signal: controller.signal })
+  const json = await response.json()
+
+  if (!response.ok) {
+    throw new Error(json?.message || `Failed to load home content (${response.status})`)
+  }
+
+  const doc = json && typeof json === 'object' && 'doc' in json ? (json as { doc: HomeDoc }).doc : (json as HomeDoc)
+  homeData = doc ?? null
+} catch (err) {
+  if (err instanceof DOMException && err.name === 'AbortError') {
+    homeError = 'Запит до бекенду перевищив ліміт часу'
+  } else {
+    homeError = err instanceof Error ? err.message : 'Failed to load data'
+  }
+} finally {
+  if (typeof fetchTimeout !== 'undefined') {
+    clearTimeout(fetchTimeout)
+  }
+}
+
+const heroImage =
+  homeData && typeof homeData['Hero Image'] === 'object' ? (homeData['Hero Image'] as MediaDoc) : null
+const headerImageUrl =
+  (heroImage?.url ? (heroImage.url.startsWith('http') ? heroImage.url : `${backendBase}${heroImage.url}`) : '/img/header.png') ||
+  '/img/header.png'
+const headerAlt = heroImage?.alt || 'BG Info header image'
+
+const infoItems = Array.isArray(homeData?.['Info List'])
+  ? (homeData['Info List'] as InfoItem[]).filter((item) => item?.info)
+  : []
+
+pageTitle = homeData?.meta?.metaTitle ?? pageTitle
+pageDescription = homeData?.meta?.metaDescription ?? pageDescription
+---
+
+<!DOCTYPE html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={pageDescription} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/css/bootstrap.css" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <title>{pageTitle}</title>
+  </head>
+  <body>
+    <main class="container body-content">
+      <img class="img-responsive center-block" src={headerImageUrl} alt={headerAlt} />
+      <p class="visible-xs-block">&nbsp;</p>
+
+      <section class="container">
+        <h4>Информация за преписка</h4>
+        <hr />
+        <p class="sr-only">Моля въведете Вашият входящ номер и ПИН код, за да проверите статуса на преписката.</p>
+
+        <div class="validation-summary-errors text-danger">
+          <ul>
+            <li>Липсва молба с така въведените данни</li>
+          </ul>
+        </div>
+
+        <form action="/BgInfo/Home/Enroll" method="post">
+          <input
+            name="__RequestVerificationToken"
+            type="hidden"
+            value="MyUgCGCK3GAatneLX9YvMX8sjh--z_RT3irFMJs3mXnHoUc2AYGxWi6HQRef62Nc5T9Pir710xStiP2W5qkURSLqNp4TIwlTKvvIGdChFo01"
+          />
+          <div class="row">
+            <div class="col-xs-12 col-sm-4">
+              <div class="well">
+                <div class="form-group">
+                  <label for="reqNum" class="control-label">Молба вх.номер</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="reqNum"
+                    name="reqNum"
+                    value=""
+                    required
+                    title="Моля въведете Вашият входящ номер"
+                    placeholder=""
+                  />
+                  <span class="help-block"></span>
+                </div>
+                <div class="form-group">
+                  <label for="pin" class="control-label">ПИН</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="pin"
+                    name="pin"
+                    value=""
+                    required
+                    title="Моля въведете Вашият входящ ПИН"
+                  />
+                  <span class="help-block"></span>
+                </div>
+                <button type="submit" class="btn btn-brown">Провери</button>
+              </div>
+            </div>
+            <div class="col-xs-12 col-sm-8">
+              <ul class="list-unstyled info-list">
+                {infoItems.length > 0 ? (
+                  infoItems.map((item) => (
+                    <li>
+                      <span class="fa fa-check text-success"></span> {item.info}
+                    </li>
+                  ))
+                ) : (
+                  <li class="text-muted">
+                    Добавете записи в глобала “Home” в админ панела на Payload, за да се покажат тук.
+                  </li>
+                )}
+              </ul>
+              {homeError && <p class="text-danger">Неуспешно зареждане на данните: {homeError}</p>}
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="container" style="margin: 30px auto 0 auto; text-align: justify">
+        <hr />
+        <p></p>
+        <hr />
+        <footer>
+          <p>&copy; 2025 - Община Бургас</p>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>
+
