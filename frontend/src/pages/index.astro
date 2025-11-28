@@ -1,11 +1,9 @@
 ---
-import { GraphQLClient, gql } from 'graphql-request'
+import { gql } from 'graphql-request'
+import { backendBase, graphqlClient } from '../lib/graphqlClient'
 
 let pageTitle = 'BG Info Enrollment'
 let pageDescription = 'Информация за записване'
-
-const backendBase = (import.meta.env.PUBLIC_PAYLOAD_URL || 'http://localhost:3000').replace(/\/$/, '')
-const graphqlClient = new GraphQLClient(`${backendBase}/api/graphql`)
 
 type MediaDoc = { url?: string; alt?: string } | null
 type InfoItem = { info?: string | null; id?: string | null }
@@ -16,7 +14,7 @@ type HomeDoc = {
 }
 
 const HOME_QUERY = gql`
-    query HomeContent {
+  query HomeContent {
     Home {
       meta {
         metaTitle
@@ -80,18 +78,13 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
         <p>&nbsp;</p>
         <p class="sr-only">Моля въведете Вашият входящ номер и ПИН код, за да проверите статуса на преписката.</p>
 
-        <div class="validation-summary-errors text-danger">
-          <ul>
-            <li>Липсва молба с така въведените данни</li>
+        <div class="validation-summary-errors text-danger" aria-live="polite">
+          <ul id="validation-list">
+            <li class="text-muted"></li>
           </ul>
         </div>
 
-        <form action="/BgInfo/Home/Enroll" method="post">
-          <input
-            name="__RequestVerificationToken"
-            type="hidden"
-            value="MyUgCGCK3GAatneLX9YvMX8sjh--z_RT3irFMJs3mXnHoUc2AYGxWi6HQRef62Nc5T9Pir710xStiP2W5qkURSLqNp4TIwlTKvvIGdChFo01"
-          />
+        <form id="request-form">
           <div class="row">
             <div class="col-xs-12 col-sm-4">
               <div class="well">
@@ -122,7 +115,7 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
                   />
                   <span class="help-block"></span>
                 </div>
-                <button type="submit" class="btn btn-brown">Провери</button>
+                <button type="submit" class="btn btn-brown" id="submit-btn">Провери</button>
               </div>
             </div>
             <div class="col-xs-12 col-sm-8">
@@ -156,3 +149,69 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
     </main>
   </body>
 </html>
+
+<script type="module">
+  const form = document.getElementById('request-form')
+  const reqNumInput = document.getElementById('reqNum')
+  const pinInput = document.getElementById('pin')
+  const submitBtn = document.getElementById('submit-btn')
+  const validationList = document.getElementById('validation-list')
+
+  const setMessages = (messages, muted = false) => {
+    if (!validationList) return
+    validationList.innerHTML = ''
+    if (!messages.length && muted) {
+      const li = document.createElement('li')
+      li.className = 'text-muted'
+      li.textContent = 'Попълнете формата и натиснете "Провери".'
+      validationList.appendChild(li)
+      return
+    }
+    messages.forEach((msg) => {
+      const li = document.createElement('li')
+      li.textContent = msg
+      validationList.appendChild(li)
+    })
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const errors = []
+    const reqNumber = reqNumInput?.value.trim() || ''
+    const pin = pinInput?.value.trim() || ''
+
+    if (!reqNumber) errors.push('Въведете номер на молба')
+    if (!pin) errors.push('Въведете ПИН')
+    setMessages(errors, true)
+    if (errors.length) return
+
+    if (submitBtn) submitBtn.disabled = true
+    setMessages(['Търсене...'])
+
+    try {
+      const res = await fetch('/api/request-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reqNumber, pin }),
+      })
+      const json = await res.json()
+
+      if (!res.ok) {
+        throw new Error(json?.error || 'Lookup failed')
+      }
+
+      const docs = json?.docs || []
+      console.log('Request lookup:', docs)
+      if (docs.length === 0) {
+        setMessages(['Липсва молба с така въведените данни'])
+      } else {
+        setMessages(['Намерени записи: ' + docs.length])
+      }
+    } catch (err) {
+      console.error('Lookup failed', err)
+      setMessages(['Неуспешна проверка. Опитайте отново.'])
+    } finally {
+      if (submitBtn) submitBtn.disabled = false
+    }
+  })
+</script>

@@ -16,5 +16,8 @@
   },
   "overrides": {
     "graphql": "16.12.0"
+  },
+  "devDependencies": {
+    "@astrojs/node": "^9.5.1"
   }
 }
