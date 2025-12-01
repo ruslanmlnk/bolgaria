@@ -13,6 +13,9 @@ const REQUEST_QUERY = `
         status
         submittedAt
         notes
+        document {
+          url
+        }
       }
     }
   }

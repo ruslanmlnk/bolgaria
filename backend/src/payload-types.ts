@@ -173,9 +173,10 @@ export interface Request {
   reqNumber: string;
   pin: string;
   applicantName: string;
-  status: 'pending' | 'review' | 'approved' | 'rejected';
+  status: string;
   submittedAt?: string | null;
   notes?: string | null;
+  document?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
 }
@@ -308,6 +309,7 @@ export interface RequestsSelect<T extends boolean = true> {
   status?: T;
   submittedAt?: T;
   notes?: T;
+  document?: T;
   updatedAt?: T;
   createdAt?: T;
 }

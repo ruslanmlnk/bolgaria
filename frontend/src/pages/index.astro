@@ -147,10 +147,91 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
         </footer>
       </section>
     </main>
+
+
+    <div id="result-modal" class="modal-overlay-custom" aria-hidden="true">
+  <div class="modal-dialog-custom" role="dialog">
+    <div class="modal-header-custom">
+      <h4>Резултат от проверката</h4>
+      <button type="button" class="modal-close-btn" data-close-modal>&times;</button>
+    </div>
+
+    <div id="result-modal-body"></div>
+
+    <div style="text-align: right; margin-top: 10px;">
+      <button type="button" class="btn btn-default" data-close-modal>Затвори</button>
+    </div>
+  </div>
+</div>
+
+
   </body>
 </html>
 
 <script type="module">
+  const backendBase = 'http://localhost:3000';
+
+const modal = document.getElementById('result-modal')
+const modalBody = document.getElementById('result-modal-body')
+
+const openModalWithDocs = (docs) => {
+  if (!docs.length) {
+    setMessages(['Липсва молба с така въведените данни'])
+    return
+  }
+
+  // Генерація карток
+  modalBody.innerHTML = docs
+    .map((doc, i) => {
+      const pdfUrl = doc.document?.url
+        ? (doc.document.url.startsWith('http')
+            ? doc.document.url
+            : `${backendBase}${doc.document.url}`)
+        : null
+
+        console.log('PDF URL:', docs);
+
+      return `
+        <div class="request-card">
+          <p><span class="request-label">#${i + 1}</span></p>
+          <p><span class="request-label">Вх. номер:</span> ${doc.reqNumber}</p>
+          <p><span class="request-label">Заявител:</span> ${doc.applicantName || '—'}</p>
+          <p><span class="request-label">Статус:</span> ${doc.status || '—'}</p>
+          <p><span class="request-label">Подано:</span> ${
+            doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('uk-UA') : '—'
+          }</p>
+          ${doc.notes ? `<p><span class="request-label">Бележки:</span> ${doc.notes}</p>` : ''}
+
+          ${
+            pdfUrl
+              ? `
+                <p style="margin-top:10px;">
+                  <a href="${pdfUrl}" target="_blank" class="pdf-download-link" title="Сваляне PDF">
+                    <img src="/img/pdf-icon.png" alt="PDF" style="width:32px; cursor:pointer;">
+                  </a>
+                </p>
+              `
+              : ''
+          }
+        </div>
+      `
+    })
+    .join('')
+
+  modal.classList.add('open')
+}
+
+
+const closeModal = () => modal.classList.remove('open')
+
+document.querySelectorAll('[data-close-modal]').forEach(btn => {
+  btn.addEventListener('click', closeModal)
+})
+
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) closeModal()
+})
+
   const form = document.getElementById('request-form')
   const reqNumInput = document.getElementById('reqNum')
   const pinInput = document.getElementById('pin')
@@ -165,13 +246,16 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
       li.className = 'text-muted'
       li.textContent = 'Попълнете формата и натиснете "Провери".'
       validationList.appendChild(li)
+      validationList.style.display = 'block'
       return
     }
     messages.forEach((msg) => {
       const li = document.createElement('li')
       li.textContent = msg
       validationList.appendChild(li)
+      validationList.style.display = 'block'
     })
+
   }
 
   form?.addEventListener('submit', async (event) => {
@@ -202,6 +286,8 @@ pageDescription = homeData?.meta?.metaDescription ?? pageDescription
 
       const docs = json?.docs || []
       console.log('Request lookup:', docs)
+      openModalWithDocs(docs)
+
       if (docs.length === 0) {
         setMessages(['Липсва молба с така въведените данни'])
       } else {

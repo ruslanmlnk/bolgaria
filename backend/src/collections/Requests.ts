@@ -33,19 +33,16 @@ export const Requests: CollectionConfig = {
       type: 'text',
       required: true,
     },
+
+    // STATUS — просте текстове поле
     {
       name: 'status',
       label: 'Status',
-      type: 'select',
-      options: [
-        { label: 'Pending', value: 'pending' },
-        { label: 'In Review', value: 'review' },
-        { label: 'Approved', value: 'approved' },
-        { label: 'Rejected', value: 'rejected' },
-      ],
-      defaultValue: 'pending',
+      type: 'text',
       required: true,
+      defaultValue: 'pending',
     },
+
     {
       name: 'submittedAt',
       label: 'Submitted At',
@@ -61,5 +58,15 @@ export const Requests: CollectionConfig = {
       label: 'Notes',
       type: 'textarea',
     },
+
+    {
+      name: 'document',
+      label: 'Document (PDF)',
+      type: 'upload',
+      relationTo: 'media',
+      required: false,
+    }
+
+
   ],
 }
