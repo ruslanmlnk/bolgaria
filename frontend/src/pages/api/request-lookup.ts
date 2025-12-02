@@ -1,25 +1,7 @@
 import type { APIRoute } from 'astro'
-import { graphqlClient } from '../../lib/graphqlClient'
+import { backendBase } from '../../lib/graphqlClient'
 
 export const prerender = false
-
-const REQUEST_QUERY = `
-  query FindRequest($reqNumber: String!, $pin: String!) {
-    Requests(where: { reqNumber: { equals: $reqNumber }, pin: { equals: $pin } }) {
-      docs {
-        id
-        reqNumber
-        applicantName
-        status
-        submittedAt
-        notes
-        document {
-          url
-        }
-      }
-    }
-  }
-`
 
 const parseBody = async (request: Request) => {
   const contentType = request.headers.get('content-type')?.toLowerCase() ?? ''
@@ -80,8 +62,21 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   try {
-    const data = await graphqlClient.request(REQUEST_QUERY, { reqNumber, pin })
-    return new Response(JSON.stringify(data?.Requests ?? {}), {
+    const url = new URL('/api/requests', backendBase)
+    url.searchParams.set('where[reqNumber][equals]', reqNumber)
+    url.searchParams.set('where[pin][equals]', pin)
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+    })
+
+    if (!res.ok) {
+      const message = await res.text().catch(() => '')
+      throw new Error(`REST lookup failed (${res.status}): ${message}`)
+    }
+
+    const data = await res.json().catch(() => null)
+    return new Response(JSON.stringify(data ?? {}), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
